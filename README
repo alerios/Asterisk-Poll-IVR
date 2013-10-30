@@ -1,0 +1,40 @@
+(C) 2013 Alejandro Rios P. <alerios@debian.org>
+
+-----------
+Description
+-----------
+
+Asterisk-Poll-IVR is a simple IVR poll for Asterisk written in Python
+
+
+------------
+Dependencies
+------------
+* Agilib
+* MySQLdb
+
+-----------
+Installation
+-----------
+
+1. Record the audio files and move them to /var/lib/asterisk/sounds
+2. Copy the Asterisk-Poll-IVR code to /var/lib/asterisk/agi-bin
+3. Create database with the schema on  asterpoll.sql
+4. Invoke the AGI from Asterisk:
+
+[default]
+exten=666,1,Goto(asterpoll,s,1)
+exten=_777X,1,Goto(asterpoll-record,${EXTEN:3},1)
+
+[asterpoll]
+exten=s,1,AGI(asterpoll/ivr)
+exten=h,1,NoOp(User Hungup)
+
+[asterpoll-record]
+exten => _X,1,Answer
+exten => _X,n,Wait(2)
+exten => _X,n,Record(question-${EXTEN}.wav)
+exten => _X,n,Wait(2)
+exten => _X,n,Playback(question-${EXTEN})
+exten => _X,n,Wait(2)
+exten => _X,n,Hangup
