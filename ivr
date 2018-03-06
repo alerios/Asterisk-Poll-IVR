@@ -1,0 +1,81 @@
+#!/usr/bin/python2.6
+#-*- coding: utf-8 -*-
+#
+#
+#Developed by: Alejandro Rios P. @alerios 
+#creation: 05/10/2010
+
+"""
+
+1. Get questions from DB
+2. Play audio and wait for answer
+3. Insert record on DB
+
+"""
+
+import agilib
+import config
+import time
+import dao
+
+#Mysql
+dao = dao.DAO()
+dao.connect()
+if (not dao.connected):
+        print "ERROR: could not connect to database!"
+#AGI 
+agi=agilib.AGI()
+
+
+def log(recordID,logmsg):
+	#Consola
+	agi.appexec("NoOp",logmsg)
+	#CDR
+	userfield=agi.get_variable('CDR(userfield)')
+	agi.set_variable('CDR(userfield)','%s-%s' % (str(userfield),str(logmsg)) )
+	#en la BD
+	dao.record_event(recordID,logmsg)
+
+#Bienvenida
+agi.appexec("Playback","beep")
+
+	
+if True:
+	epoch=agi.get_variable('EPOCH')
+	uniqueid=agi.get_variable('UNIQUEID')
+	queue_name=agi.get_variable('QUEUENAME')
+	queue_member=agi.get_variable('MEMBERINTERFACE')
+	recordID = '%s-%s-%s-%s' % (str(epoch),str(uniqueid),str(queue_name),str(queue_member))
+
+	#Se obtiene el caller-id
+	callerid=agi.env.get('agi_callerid','UNKNOWN')
+	log(recordID, 'callerid_%s' % callerid)
+	#callerid='2218639'	
+
+	preguntas = dao.getPreguntas()
+	completas=0	
+	for preg in preguntas:
+		log(recordID,'pregunta_%s' % preg.getId())
+		saved=0
+		#agi.appexec('Wait','1')
+		for rev in range(config.REVIEW_N_TRIES):
+			respuesta=0	
+			respuesta=agi.get_data(preg.getAudio(),max_digits=1)
+			# Handle the recording
+			log(recordID,'respuesta_%s' % respuesta)
+			#; 1 accept
+			if (respuesta in preg.getOpciones()):
+				# Agregar respuesta en BD
+				insertedID = dao.addRespuesta(recordID,callerid,preg.getId(),respuesta)
+				#post = True
+				log(recordID,'saved_%s' % insertedID)
+				saved=1
+				break
+		if saved:
+			completas+=1
+			continue
+	log(recordID,'respuestas_%s' % completas)
+
+	agi.appexec('Playback','beep')
+	agi.appexec('Playback','gracias')
+
